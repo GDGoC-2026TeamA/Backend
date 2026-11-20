@@ -12,6 +12,13 @@ def find_by_login(conn, login_id):
     ).fetchone()
 
 
+def find_by_email(conn, email):
+    return conn.execute(
+        "SELECT id,password_hash FROM app_users WHERE lower(email)=lower(%s)",
+        (email,),
+    ).fetchone()
+
+
 def delete_expired_sessions(conn, user_id):
     conn.execute(
         "DELETE FROM login_sessions WHERE user_id=%s AND expires_at<=now()", (user_id,)

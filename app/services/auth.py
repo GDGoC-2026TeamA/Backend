@@ -6,7 +6,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
 from app.dao import auth as auth_dao
-from app.schemas.auth import Login, Signup
+from app.schemas.auth import EmailLogin, Login, Signup
 from app.services.errors import ServiceError
 
 hasher = PasswordHasher()
@@ -22,9 +22,18 @@ def session_user_id(conn, token: str):
 
 def login(data: Login, conn):
     row = auth_dao.find_by_login(conn, data.login_id)
+    return _authenticate(conn, row, data.password.get_secret_value())
+
+
+def login_by_email(data: EmailLogin, conn):
+    row = auth_dao.find_by_email(conn, data.email)
+    return _authenticate(conn, row, data.password.get_secret_value())
+
+
+def _authenticate(conn, row, password: str):
     if row and row["password_hash"]:
         try:
-            hasher.verify(row["password_hash"], data.password.get_secret_value())
+            hasher.verify(row["password_hash"], password)
         except (VerificationError, InvalidHashError):
             pass
         else:
