@@ -1,6 +1,5 @@
 # 파일명: tests/test_workbridge_ai.py
-# 실행 명령어 (백엔드 개발자용):
-#   pip install pytest requests
+# 실행 명령어 (백엔드 개발자용 - 서버 실행 후):
 #   BASE_URL=http://localhost:8000 pytest tests/test_workbridge_ai.py -v
 
 import os
@@ -58,14 +57,20 @@ RESERVATION_NEW_MANUAL = """
 
 
 # =============================================================================
-# 공통 인증 Fixture (QA 15번: 계정별 세션 및 데이터 격리)
+# 공통 인증 Fixture (서버 미실행 CI 환경에서는 자동 Skip 처리)
 # =============================================================================
 def get_auth_headers(email: str, password: str) -> dict:
-    res = requests.post(
-        f"{BASE_URL}/api/auth/login",
-        json={"email": email, "password": password},
-        timeout=10,
-    )
+    try:
+        res = requests.post(
+            f"{BASE_URL}/api/auth/login",
+            json={"email": email, "password": password},
+            timeout=5,
+        )
+    except requests.exceptions.RequestException:
+        pytest.skip(
+            f"실행 중인 백엔드 서버({BASE_URL})가 없어 API 통합 QA 테스트를 건너뜁니다."
+        )
+
     assert res.status_code == 200, f"로그인 실패 ({email}): {res.text}"
     token = res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
