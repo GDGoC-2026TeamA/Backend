@@ -9,5 +9,5 @@ py -3 -m venv .venv
 
 VS Code에서 Python 인터프리터로 `.venv\Scripts\python.exe`를 선택합니다.
 
-- API 문서: http://127.0.0.1:8000/docs
-- 상태 확인: http://127.0.0.1:8000/health
+- API 문서: [https://gdgoc2026a.up.railway.app/docs](https://gdgoc2026a.up.railway.app/docs)
+- 상태 확인: [https://gdgoc2026a.up.railway.app/health](https://gdgoc2026a.up.railway.app/health)
