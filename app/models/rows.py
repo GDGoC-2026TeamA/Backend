@@ -34,15 +34,14 @@ class WorkspaceMemberRow(BaseModel):
 
 
 class TaskRow(BaseModel):
-    workspace_id: int
-    shared_analysis_id: int | None
-    shared_at: datetime | None
-    updated_at: datetime
-class TaskRow(BaseModel):
     id: int
     created_by: int
     name: str
     description: str | None
+    workspace_id: int | None = None
+    shared_analysis_id: int | None = None
+    shared_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class SourceRef(BaseModel):
