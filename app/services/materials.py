@@ -1,6 +1,9 @@
+from pathlib import Path
 from typing import BinaryIO, Literal
 
 from app.dao import materials as materials_dao
+from app.schemas.tasks import SampleRequest
+from app.services import files
 from app.services.access import required, task_for, version
 from app.services.errors import ServiceError
 from app.storage import bucket
@@ -18,26 +21,43 @@ def upload(
     size: int | None,
 ):
     task_for(conn, tid, uid, edit=True)
-    if content_type not in ("application/pdf", "image/jpeg", "image/png"):
-        raise ServiceError(415, "PDF, JPG, PNG 파일을 등록하세요.")
-    if size is None or size > 16 * 1024 * 1024:
-        raise ServiceError(413, "파일 크기는 16MB 이하여야 합니다.")
-    s3, name = bucket()
-    row = materials_dao.insert_pending(conn, tid, kind, filename or "자료")
-    conn.commit()
-    try:
-        s3.upload_fileobj(
-            stream,
-            name,
-            f"files/v1/{row['id']}",
-            ExtraArgs={"ContentType": content_type},
+    return files.upload(
+        conn,
+        lambda: materials_dao.insert_pending(conn, tid, kind, filename or "자료"),
+        stream=stream,
+        content_type=content_type,
+        size=size,
+    )
+
+
+SAMPLES_DIR = Path(__file__).resolve().parent.parent / "samples"
+
+# scenario -> [(자료 종류, 파일명)]. 파일은 app/samples/{scenario}/ 아래에 둔다.
+SAMPLES: dict[str, list[tuple[str, str]]] = {
+    "inventory": [
+        ("previous_form", "기존_입고_처리_대장.pdf"),
+        ("manual", "신규_재고관리_시스템_매뉴얼.pdf"),
+    ],
+}
+
+
+def load_samples(tid: int, data: SampleRequest, uid, conn):
+    task_for(conn, tid, uid, edit=True)
+    created = []
+    for kind, filename in SAMPLES[data.scenario]:
+        path = SAMPLES_DIR / data.scenario / filename
+        with path.open("rb") as stream:
+            row = files.upload(
+                conn,
+                lambda k=kind, n=filename: materials_dao.insert_pending(conn, tid, k, n),
+                stream=stream,
+                content_type="application/pdf",
+                size=path.stat().st_size,
+            )
+        created.append(
+            {"id": row["id"], "kind": kind, "filename": filename, "status": "ready"}
         )
-    except Exception:
-        materials_dao.mark_failed(conn, row["id"])
-        conn.commit()
-        raise ServiceError(503, "파일 저장에 실패했습니다.") from None
-    materials_dao.mark_ready(conn, row["id"])
-    return row
+    return {"materials": created}
 
 
 def list_materials(tid: int, uid, conn):
@@ -59,7 +79,7 @@ def download(tid: int, fid: int, uid, conn):
     return {
         "url": s3.generate_presigned_url(
             "get_object",
-            Params={"Bucket": name, "Key": f"files/v1/{fid}"},
+            Params={"Bucket": name, "Key": files.object_key(fid)},
             ExpiresIn=120,
         )
     }

@@ -23,3 +23,8 @@ def home(
     conn=Depends(db),
 ):
     return tasks_service.home(workspaceId, filter, uid, conn)
+
+
+@router.get("/tasks/{tid}")
+def task_detail(tid: int, uid=Depends(user), conn=Depends(db)):
+    return tasks_service.detail(tid, uid, conn)

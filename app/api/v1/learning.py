@@ -23,6 +23,11 @@ def answer(pid: int, data: Answers, uid=Depends(user), conn=Depends(db)):
     return learning_service.answer(pid, data, uid, conn)
 
 
+@router.get("/practices/{pid}/result")
+def result(pid: int, uid=Depends(user), conn=Depends(db)):
+    return learning_service.result(pid, uid, conn)
+
+
 @router.post("/tasks/{tid}/questions", status_code=201)
 def ask(tid: int, data: Question, uid=Depends(user), conn=Depends(db)):
     return learning_service.ask(tid, data, uid, conn)
@@ -31,3 +36,8 @@ def ask(tid: int, data: Question, uid=Depends(user), conn=Depends(db)):
 @router.get("/me/learning-history")
 def history(uid=Depends(user), conn=Depends(db)):
     return learning_service.history(uid, conn)
+
+
+@router.get("/me/learning-history/{rid}")
+def history_detail(rid: int, uid=Depends(user), conn=Depends(db)):
+    return learning_service.history_detail(rid, uid, conn)
