@@ -4,11 +4,21 @@ import psycopg
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.v1.router import router as api_router
 from app.services.errors import ServiceError
 
 app = FastAPI(title="Backend")
+if oauth_secret := os.getenv("OAUTH_SESSION_SECRET"):
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=oauth_secret,
+        session_cookie="__Host-workbridge-oauth",
+        max_age=600,
+        same_site="lax",
+        https_only=True,
+    )
 
 
 @app.get("/health")

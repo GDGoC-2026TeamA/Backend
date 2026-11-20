@@ -61,6 +61,50 @@ def env(monkeypatch):
     reset_schema()
 
 
+def test_social_session_reuses_provider_identity(env):
+    from app.api.v1.social import _social_session
+    from psycopg.rows import dict_row
+
+    client = TestClient(app)
+    with psycopg.connect(URL, row_factory=dict_row) as conn:
+        first = _social_session(conn, "google", "subject-1", "Google 사용자")
+        again = _social_session(conn, "google", "subject-1", "다른 표시 이름")
+        kakao = _social_session(conn, "kakao", "subject-1", "카카오 사용자")
+    def workspace(result):
+        response = client.get("/api/v1/workspaces", headers={"Authorization": "Bearer " + result["token"]})
+        assert response.status_code == 200
+        return response.json()[0]["id"]
+
+    assert first != again
+    assert workspace(first) == workspace(again)
+    assert workspace(first) != workspace(kakao)
+
+
+def test_email_login(env):
+    client = TestClient(app)
+    account = {
+        "name": "테스트",
+        "login_id": "warehouse-user",
+        "email": "Warehouse@sample.test",
+        "password": "test-password",
+    }
+    assert client.post("/api/v1/accounts", json=account).status_code == 201
+    url = "/api/v1/sessions/email"
+    credentials = {"email": "warehouse@SAMPLE.test", "password": account["password"]}
+    response = client.post(url, json=credentials)
+    assert response.status_code == 200
+    token = response.json()["token"]
+    spaces = client.get("/api/v1/workspaces", headers={"Authorization": f"Bearer {token}"})
+    assert spaces.status_code == 200
+    assert any(space["kind"] == "personal" and space["is_owner"] for space in spaces.json())
+
+    wrong = client.post(url, json={**credentials, "password": "incorrect"})
+    unknown = client.post(url, json={**credentials, "email": "unknown@sample.test"})
+    assert wrong.status_code == unknown.status_code == 401
+    assert wrong.json() == unknown.json()
+    assert client.post(url, json={**credentials, "email": "invalid"}).status_code == 422
+
+
 def test_full_flow(env, monkeypatch):
     c = TestClient(app)
 
