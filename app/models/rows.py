@@ -21,11 +21,27 @@ class SocialAccountRow(BaseModel):
     subject: str
 
 
+class WorkspaceRow(BaseModel):
+    id: int
+    kind: Literal["personal", "company"]
+    name: str
+    created_by: int
+
+
+class WorkspaceMemberRow(BaseModel):
+    workspace_id: int
+    user_id: int
+
+
 class TaskRow(BaseModel):
     id: int
     created_by: int
     name: str
     description: str | None
+    workspace_id: int | None = None
+    shared_analysis_id: int | None = None
+    shared_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class SourceRef(BaseModel):
