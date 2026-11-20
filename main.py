@@ -1,7 +1,12 @@
 import os
 
 import psycopg
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.api.v1.router import router as api_router
+from app.services.errors import ServiceError
 
 app = FastAPI(title="Backend")
 
@@ -26,11 +31,13 @@ def database_health():
     return {"status": "ok", "database": "connected"}
 
 
-from app.workspaces import router as workspace_router
+@app.exception_handler(ServiceError)
+async def service_error_response(request: Request, exc: ServiceError):
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
-app.include_router(workspace_router)
 
-from fastapi.middleware.cors import CORSMiddleware
+app.include_router(api_router)
+
 
 # 명시적으로 전달하는 Bearer 토큰만 사용한다. 쿠키 인증은 허용하지 않는다.
 app.add_middleware(

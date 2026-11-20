@@ -6,7 +6,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from main import app
-from app import workspaces
+from app.ai import gemini_client
 
 
 # Set only for an empty disposable database; CI provisions one per run.
@@ -75,7 +75,7 @@ def test_workspace_isolation_and_learning(monkeypatch):
     call("POST", path + "/reviews", owner, {**body, "share": False}).raise_for_status()
     assert call("GET", listing, other).json()["tasks"][0]["sharedAnalysisId"] == aid
     monkeypatch.setattr(
-        workspaces,
+        gemini_client,
         "generate_json",
         lambda *args: [
             {"itemId": unknown["itemId"], "reason": "skip"},
@@ -96,7 +96,7 @@ def test_workspace_isolation_and_learning(monkeypatch):
         == 409
     )
     monkeypatch.setattr(
-        workspaces,
+        gemini_client,
         "generate_json",
         lambda *args: {
             "situation": "입고",
