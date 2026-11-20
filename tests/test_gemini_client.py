@@ -2,6 +2,7 @@ import json
 import os
 from unittest.mock import MagicMock
 
+import psycopg
 import pytest
 import requests
 
@@ -34,8 +35,9 @@ def gemini_response(payload: dict, status_code: int = 200) -> MagicMock:
 
 @pytest.fixture(autouse=True)
 def clean_history(monkeypatch):
-    """테스트끼리 로컬 대화 기록이 섞이지 않도록 매번 비운다."""
+    """테스트끼리 로컬 대화 기록이 섞이지 않도록 매번 비우고, 실제 DB는 쓰지 않는다."""
     monkeypatch.setattr(history, "_local_history", {})
+    monkeypatch.delenv("DATABASE_URL", raising=False)
 
 
 @pytest.fixture
@@ -125,6 +127,73 @@ def test_invalid_json_does_not_save_history(post):
         generate_json("hi", SCHEMA, session_id="test")
 
     assert "test" not in history._local_history
+
+
+class FakeHistoryStore:
+    """ai_histories DAO 대신 쓰는 메모리 저장소."""
+
+    def __init__(self):
+        self.rows: dict[str, list[dict]] = {}
+
+    def fetch(self, conn, session_id):
+        return self.rows.get(session_id)
+
+    def upsert(self, conn, session_id, contents):
+        self.rows[session_id] = contents
+
+    def delete(self, conn, session_id):
+        self.rows.pop(session_id, None)
+
+
+@pytest.fixture
+def store(monkeypatch):
+    fake = FakeHistoryStore()
+    monkeypatch.setattr(history, "ai_histories_dao", fake)
+    monkeypatch.setattr(history, "_connect", MagicMock())
+    return fake
+
+
+def test_turn_is_saved_to_db(post, store):
+    post.return_value = gemini_response({"reply": "ok"})
+
+    generate_json("hi", SCHEMA, session_id="test")
+
+    assert [c["role"] for c in store.rows["test"]] == ["user", "model"]
+
+
+def test_history_is_restored_from_db_when_local_cache_is_empty(post, store):
+    store.rows["test"] = [
+        {"role": "user", "parts": [{"text": "이전 질문"}]},
+        {"role": "model", "parts": [{"text": '{"reply": "이전 답"}'}]},
+    ]
+    post.return_value = gemini_response({"reply": "ok"})
+
+    generate_json("이어서 질문", SCHEMA, session_id="test")
+
+    assert [c["role"] for c in sent_contents(post)] == ["user", "model", "user"]
+    assert history._local_history["test"][0]["parts"] == [{"text": "이전 질문"}]
+
+
+def test_clear_history_removes_local_and_db(store):
+    store.rows["test"] = [{"role": "user", "parts": [{"text": "x"}]}]
+    history._local_history["test"] = list(store.rows["test"])
+
+    history.clear_history("test")
+
+    assert "test" not in history._local_history
+    assert "test" not in store.rows
+
+
+def test_db_error_falls_back_to_local_history(post, monkeypatch):
+    monkeypatch.setattr(
+        history, "_connect", MagicMock(side_effect=psycopg.OperationalError("down"))
+    )
+    post.return_value = gemini_response({"reply": "ok"})
+
+    result = generate_json("hi", SCHEMA, session_id="test")
+
+    assert result == {"reply": "ok"}
+    assert [c["role"] for c in history._local_history["test"]] == ["user", "model"]
 
 
 @pytest.mark.skipif(
