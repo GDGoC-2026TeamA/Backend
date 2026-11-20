@@ -24,3 +24,18 @@ def database_health():
         raise HTTPException(503, detail="DB에 연결할 수 없습니다.") from None
 
     return {"status": "ok", "database": "connected"}
+
+
+from app.workspaces import router as workspace_router
+
+app.include_router(workspace_router)
+
+from fastapi.middleware.cors import CORSMiddleware
+
+# 명시적으로 전달하는 Bearer 토큰만 사용한다. 쿠키 인증은 허용하지 않는다.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
