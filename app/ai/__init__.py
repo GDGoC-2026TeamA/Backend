@@ -18,7 +18,9 @@ def analyze_workflow(description: str, files: list[InlineFile]) -> dict:
     return generate_json(prompt, ANALYZE_WORKFLOW_SCHEMA, files=files)
 
 
-def answer_question(question: str, sources: list[dict], files: list[InlineFile] | None = None) -> dict:
+def answer_question(
+    question: str, sources: list[dict], files: list[InlineFile] | None = None
+) -> dict:
     """
     F-07 업무 질의응답.
     sources 예: [{"name": "재고관리_매뉴얼.pdf", "text": "..."}]
@@ -26,7 +28,8 @@ def answer_question(question: str, sources: list[dict], files: list[InlineFile] 
     """
     source_text = "\n\n".join(f"[{s['name']}]\n{s['text']}" for s in sources)
     prompt = QA_PROMPT.format(
-        question=question, sources=source_text or "(제공된 텍스트 자료 없음)",
+        question=question,
+        sources=source_text or "(제공된 텍스트 자료 없음)",
         grounding=build_grounding(),
     )
     return generate_json(prompt, QA_SCHEMA, files=files, temperature=0.1)
@@ -37,7 +40,9 @@ def generate_practice(steps: list[dict]) -> dict:
     if not steps:
         raise ValueError("확정된 절차가 없으면 연습을 만들지 않는다 (F-05 수용 기준)")
     prompt = PRACTICE_PROMPT.format(
-        steps="\n".join(f"{s['order']}. {s['title']}: {s['description']}" for s in steps),
+        steps="\n".join(
+            f"{s['order']}. {s['title']}: {s['description']}" for s in steps
+        ),
         grounding=build_grounding(),
     )
     return generate_json(prompt, PRACTICE_SCHEMA)
