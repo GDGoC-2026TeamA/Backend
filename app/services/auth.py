@@ -37,11 +37,7 @@ def _authenticate(conn, row, password: str):
         except (VerificationError, InvalidHashError):
             pass
         else:
-            token = secrets.token_urlsafe(32)
-            digest = hashlib.sha256(token.encode()).digest()
-            auth_dao.delete_expired_sessions(conn, row["id"])
-            auth_dao.insert_session(conn, digest, row["id"])
-            return {"token": token}
+            return issue_session(conn, row["id"])
     raise ServiceError(401, "로그인 정보를 확인하세요.")
 
 
@@ -56,3 +52,11 @@ def signup(data: Signup, conn):
         )
     except psycopg.errors.UniqueViolation:
         raise ServiceError(409, "이미 등록된 계정입니다.") from None
+
+
+def issue_session(conn, user_id):
+    token = secrets.token_urlsafe(32)
+    digest = hashlib.sha256(token.encode()).digest()
+    auth_dao.delete_expired_sessions(conn, user_id)
+    auth_dao.insert_session(conn, digest, user_id)
+    return {"token": token}

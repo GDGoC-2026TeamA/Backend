@@ -7,6 +7,7 @@ from app.api.v1 import (
     jobs,
     learning,
     materials,
+    social,
     tasks,
     workspaces,
 )
@@ -20,3 +21,4 @@ router.include_router(learning.router)
 router.include_router(materials.router)
 router.include_router(cards.router)
 router.include_router(jobs.router)
+router.include_router(social.router)

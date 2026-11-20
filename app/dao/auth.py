@@ -45,3 +45,20 @@ def insert_account(conn, name, login_id, email, password_hash):
             password_hash,
         ),
     ).fetchone()
+
+
+def social_user(conn, provider, subject, name):
+    # Serialize first-time sign-ins for this identity until the transaction commits.
+    conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (provider + ":" + subject,))
+    existing = conn.execute(
+        "SELECT user_id FROM social_accounts WHERE provider=%s AND subject=%s",
+        (provider, subject),
+    ).fetchone()
+    if existing:
+        return existing["user_id"]
+    uid = conn.execute("INSERT INTO app_users(name) VALUES (%s) RETURNING id", (name,)).fetchone()["id"]
+    conn.execute(
+        "INSERT INTO social_accounts(user_id,provider,subject) VALUES (%s,%s,%s)",
+        (uid, provider, subject),
+    )
+    return uid

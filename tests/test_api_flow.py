@@ -61,6 +61,25 @@ def env(monkeypatch):
     reset_schema()
 
 
+def test_social_session_reuses_provider_identity(env):
+    from app.api.v1.social import _social_session
+    from psycopg.rows import dict_row
+
+    client = TestClient(app)
+    with psycopg.connect(URL, row_factory=dict_row) as conn:
+        first = _social_session(conn, "google", "subject-1", "Google 사용자")
+        again = _social_session(conn, "google", "subject-1", "다른 표시 이름")
+        kakao = _social_session(conn, "kakao", "subject-1", "카카오 사용자")
+    def workspace(result):
+        response = client.get("/api/v1/workspaces", headers={"Authorization": "Bearer " + result["token"]})
+        assert response.status_code == 200
+        return response.json()[0]["id"]
+
+    assert first != again
+    assert workspace(first) == workspace(again)
+    assert workspace(first) != workspace(kakao)
+
+
 def test_email_login(env):
     client = TestClient(app)
     account = {
