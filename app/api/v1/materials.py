@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.api.dependencies import user
 from app.database import db
+from app.schemas.tasks import SampleRequest
 from app.services import materials as materials_service
 
 router = APIRouter()
@@ -27,6 +28,13 @@ def upload(
         content_type=file.content_type,
         size=file.size,
     )
+
+
+@router.post("/tasks/{tid}/sample-materials", status_code=201)
+def sample_materials(
+    tid: int, data: SampleRequest, uid=Depends(user), conn=Depends(db)
+):
+    return materials_service.load_samples(tid, data, uid, conn)
 
 
 @router.get("/tasks/{tid}/materials")

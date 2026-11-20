@@ -1,5 +1,6 @@
 from app.dao import (
     analyses as analyses_dao,
+    jobs as jobs_dao,
     tasks as tasks_dao,
     workspaces as workspaces_dao,
 )
@@ -39,3 +40,11 @@ def eligible(step):
         and step.get("change") != "미확인"
         and bool(step.get("sources"))
     )
+
+
+def job_for(conn, jid, uid, *, edit=False):
+    """본인 작업만 연다. edit이면 행을 잠그고 최종 저장된 작업은 막는다."""
+    row = required(jobs_dao.find_owned(conn, jid, uid, lock=edit))
+    if edit and row["saved_at"] is not None:
+        raise ServiceError(409, "저장이 끝난 작업은 수정할 수 없습니다.")
+    return row
