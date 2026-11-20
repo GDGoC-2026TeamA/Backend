@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import requests
+from app.config import GEMINI_API_KEY, GEMINI_BASE_URL, GEMINI_MODEL
 
 from app.config import GEMINI_API_KEY, GEMINI_BASE_URL, GEMINI_MODEL
 
