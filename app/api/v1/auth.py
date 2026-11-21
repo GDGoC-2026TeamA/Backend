@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.database import db
-from app.schemas.auth import Login, Signup
+from app.schemas.auth import EmailLogin, Login, Signup
 from app.services import auth as auth_service
 
 router = APIRouter()
@@ -10,6 +10,11 @@ router = APIRouter()
 @router.post("/sessions")
 def login(data: Login, conn=Depends(db)):
     return auth_service.login(data, conn)
+
+
+@router.post("/sessions/email")
+def login_by_email(data: EmailLogin, conn=Depends(db)):
+    return auth_service.login_by_email(data, conn)
 
 
 @router.post("/accounts", status_code=201)
