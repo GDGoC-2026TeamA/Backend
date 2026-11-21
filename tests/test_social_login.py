@@ -33,7 +33,7 @@ def login_flow(monkeypatch):
     social.provider_client.cache_clear()
     key = RSAKey.generate_key(2048, parameters={"kid": "test"})
 
-    def start(provider):
+    def start(provider, challenge=None):
         root = f"/sessions/social/{provider}"
         client_id = f"{provider}-client"
         callback = f"https://backend.test{root}/callback"
@@ -87,7 +87,9 @@ def login_flow(monkeypatch):
         client = TestClient(
             app, base_url="https://backend.test", follow_redirects=False
         )
-        response = client.get(root + "/start")
+        response = client.get(
+            root + "/start", params={"challenge": challenge} if challenge else {}
+        )
         assert response.status_code == 302
         values = parse_qs(urlsplit(response.headers["location"]).query)
         assert values["redirect_uri"] == [callback]
@@ -126,4 +128,31 @@ def test_invalid_callback_issues_no_session(login_flow, invalid):
     else:
         claims[invalid] = "other"
     assert client.get(callback, params=params).status_code == 401
+    assert users == []
+
+
+@pytest.mark.parametrize("provider", ["google", "kakao"])
+def test_browser_redirect_after_verified_login(login_flow, monkeypatch, provider):
+    start, users = login_flow
+    challenge = "A" * 43
+    front = "https://frontend.test/auth/callback"
+    monkeypatch.setenv("SOCIAL_FRONTEND_CALLBACK_URL", front)
+
+    def issue(conn, actual_provider, subject, name, actual_challenge):
+        assert (actual_provider, subject, actual_challenge) == (
+            provider,
+            "member-42",
+            challenge,
+        )
+        return "temporary-code"
+
+    monkeypatch.setattr(routes.social_exchange, "create_code", issue)
+    client, callback, params, _ = start(provider, challenge)
+    response = client.get(callback, params=params)
+    assert response.status_code == 303
+    assert response.headers["location"] == front + "#code=temporary-code"
+    assert (
+        client.get(callback, params=params).headers["location"]
+        == front + "#error=login_failed"
+    )
     assert users == []
