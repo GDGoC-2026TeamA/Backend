@@ -32,12 +32,12 @@ def provider_client(provider: Provider):
     )
 
 
-async def begin(request, provider: Provider):
+async def begin(request, provider: Provider, **authorization):
     redirect_uri = os.getenv(f"{provider.upper()}_REDIRECT_URI")
     if "session" not in request.scope or not redirect_uri:
         raise ServiceError(503, "소셜 로그인 설정이 필요합니다.")
     try:
-        return await provider_client(provider).authorize_redirect(request, redirect_uri)
+        return await provider_client(provider).authorize_redirect(request, redirect_uri, **authorization)
     except httpx.HTTPError:
         raise ServiceError(502, "로그인 제공자에 연결하지 못했습니다.") from None
 

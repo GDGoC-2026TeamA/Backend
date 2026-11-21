@@ -80,6 +80,33 @@ def test_social_session_reuses_provider_identity(env):
     assert workspace(first) != workspace(kakao)
 
 
+def test_browser_exchange_is_bound_to_the_tab_and_single_use(env):
+    import base64
+    import hashlib
+    import secrets
+
+    from app.services.social_exchange import create_code
+    from psycopg.rows import dict_row
+
+    verifier = secrets.token_urlsafe(32)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+    with psycopg.connect(URL, row_factory=dict_row) as conn:
+        code = create_code(conn, "kakao", "social-subject", "카카오 사용자", challenge)
+        expired = create_code(conn, "google", "other", "다른 사용자", challenge)
+        conn.execute("UPDATE social_login_codes SET expires_at=now() WHERE code_hash=%s", (hashlib.sha256(expired.encode()).digest(),))
+    client = TestClient(app)
+    url = "/api/v1/sessions/social/exchange"
+    payload = {"code": code, "verifier": verifier}
+    assert client.post(url, json={**payload, "code": expired}).status_code == 401
+    assert client.post(url, json={**payload, "verifier": secrets.token_urlsafe(32)}).status_code == 401
+    response = client.post(url, json=payload)
+    assert response.status_code == 200
+    result = response.json()
+    assert result["user"]["name"] == "카카오 사용자"
+    assert client.get("/api/v1/workspaces", headers={"Authorization": "Bearer " + result["token"]}).status_code == 200
+    assert client.post(url, json=payload).status_code == 401
+
+
 def test_email_login(env):
     client = TestClient(app)
     account = {
